@@ -1,0 +1,217 @@
+# Atech
+
+> Modular electronics kit: pre-built modules slide into an ESP32-S3 board, no soldering. Build from atech.dev or from your own coding agent with the Python SDK (pip install atech).
+
+## For AI agents
+
+If you were asked to learn about Atech, this file is the complete reference. Read it all, then tell the user what Atech is (Overview below) and what they can build with the modules.
+
+To build or program real Atech hardware, install the open-source Python SDK on the user's machine and read its guide before writing anything:
+
+    pip install atech        (or: uv pip install atech; needs Python 3.10+)
+    atech guide              the SDK's manual for coding agents: workflow, rules, pitfalls
+    atech list-modules       every module, with its API
+
+Ask the user which board and modules they own, and which port each module is in, before writing firmware. The full workflow is under "Build with your own agent" at the end of this file. If they have no board yet, point them to https://atech.dev/buy.
+
+More:
+- MCP connector for Claude, ChatGPT and other assistants: https://atech.dev/mcp
+- SDK source and README: https://github.com/atechdotdev/python-sdk
+- SDK on PyPI: https://pypi.org/project/atech/
+- Docs for people: https://atech.dev/docs
+- Help: https://discord.gg/B6kuhUW27S, hello@atech.dev
+
+## Overview
+
+Atech (atech.dev) is a modular electronics kit from Copenhagen: pre-built modules slide into numbered ports on an ESP32-S3 motherboard, no soldering. You describe what to build at https://atech.dev/editor, the AI picks modules and writes the firmware, and you upload it from the browser.
+
+Board: 12 module ports (1-7, 9-11, 13-14). Port 8 is the USB-C socket, port 12 the reset button. Double-width modules take two neighbouring ports on one side: 1-2, 2-3, 3-4, 4-5, 5-6, 9-10, 10-11, 13-14. Moving a module means moving it in the editor too and uploading again.
+
+Needs: a desktop Chromium browser (Chrome, Edge, Brave, Opera, Arc; uploading uses Web Serial, which Firefox, Safari and phones lack) and a USB-C data cable (charge-only cables cannot program the board).
+
+Steps: 1) describe the build at https://atech.dev/editor, 2) put the modules where the diagram shows, 3) plug in over USB-C (no driver), 4) pick WiFi (add WiFi credentials in the connection pill; 2.4 GHz only) or USB (click "Connect device via USB" once), 5) click "Upload Code".
+
+Protocol: the board speaks JSON. Events come from the board: {"event_type":"sensor|button|state|log","key":"<event key>","value":<value>}. Actions go to it: {"action":"<action key>","value":<value>}. Over WiFi: WebSocket wss://gateway.atech.dev/ws/live/<project id>; the board's messages arrive as {"type":"device_event","payload":{...}}, you send {"type":"send_to_device","device_id":"<project id>","payload":{...}}. Over USB: 115200 baud, one JSON object per line; from the board {"type":"event","payload":{...}}, to the board {"action":...,"value":...}. The project id is in the editor's Docs tab under "Your project".
+
+Modules: Temperature & Humidity (aht20_sensor), Air Quality (scd40_air_quality), Distance Sensor (vl53l5cx_distance), Orientation Sensor (icm40608_imu), Button (button_module), Light Grid (neopixel_grid), Color Display (st7735_tft, 2 ports), Big Screen (st7789_tft, 2 ports), DC Motor (dc_motor), Knob (rotary_encoder_knob, 2 ports), Microphone (microphone, 2 ports), Robot Arm Integrator (robot_arm), Speaker (speaker, 2 ports), Soil Sensor (soil_sensor).
+
+Own agent: pip install atech (Python SDK, open source, Python 3.10+) gives Claude Code, Codex, Cursor or any coding agent the module catalogue, each module's API and an offline compiler. The agent runs atech guide first, then atech list-modules, atech new, atech validate, atech build, atech upload, atech check. The first build downloads the ESP32 compiler (about 2.4 GB, once).
+
+Troubleshooting: board will not connect or upload fails -> unplug and replug, close other atech.dev tabs and the Arduino Serial Monitor (one program can hold the port), use a data cable, no hub, press reset, on Linux join the dialout group. No upload button -> not a desktop Chromium browser. Board offline after upload -> wait up to 60 s, then replug or reset; on WiFi check the credentials. Code connects but nothing arrives -> board is not online, check "Receiving frames" in the connection pill. Connection refused -> wrong project id in the address. Action ignored -> the firmware only accepts actions of the modules in that build.
+
+Help: Discord https://discord.gg/B6kuhUW27S, hello@atech.dev. Full reference with every event and action: https://atech.dev/llms.txt. Connector for Claude, ChatGPT and other assistants (MCP): https://atech.dev/mcp
+
+## Module reference
+
+### Temperature & Humidity (aht20_sensor)
+Events the board sends:
+- temperature (float C): Temperature reading in Celsius e.g. {"type":"sensor","key":"temperature","value":23.5,"module_type":"aht20"}
+- humidity (float %RH): Relative humidity percentage e.g. {"type":"sensor","key":"humidity","value":65.2,"module_type":"aht20"}
+
+### Air Quality (scd40_air_quality)
+Events the board sends:
+- co2 (int ppm): CO2 concentration in parts per million e.g. {"type":"sensor","key":"co2","value":712,"module_type":"scd40"}
+- temperature (float C): Temperature reading in Celsius (from the SCD40's onboard sensor used for CO2 compensation) e.g. {"type":"sensor","key":"temperature","value":23.5,"module_type":"scd40"}
+- humidity (float %RH): Relative humidity percentage (from the SCD40's onboard sensor used for CO2 compensation) e.g. {"type":"sensor","key":"humidity","value":48.1,"module_type":"scd40"}
+
+### Distance Sensor (vl53l5cx_distance)
+Events the board sends:
+- distance (int mm): Distance measurement in millimeters e.g. {"type":"sensor","key":"distance","value":1250,"module_type":"vl53l5cx"}
+- min_distance (int mm): Minimum distance across all 64 zones e.g. {"type":"sensor","key":"min_distance","value":450,"module_type":"vl53l5cx"}
+
+### Orientation Sensor (icm40608_imu)
+Events the board sends:
+- accel_x (float g): X-axis acceleration in g e.g. {"type":"sensor","key":"accel_x","value":0.98,"module_type":"icm40608"}
+- accel_y (float g): Y-axis acceleration in g e.g. {"type":"sensor","key":"accel_y","value":0.05,"module_type":"icm40608"}
+- accel_z (float g): Z-axis acceleration in g e.g. {"type":"sensor","key":"accel_z","value":0.12,"module_type":"icm40608"}
+- gyro_x (float deg/s): X-axis rotation rate in degrees/second e.g. {"type":"sensor","key":"gyro_x","value":12.5,"module_type":"icm40608"}
+- gyro_y (float deg/s): Y-axis rotation rate in degrees/second e.g. {"type":"sensor","key":"gyro_y","value":-5.2,"module_type":"icm40608"}
+- gyro_z (float deg/s): Z-axis rotation rate in degrees/second e.g. {"type":"sensor","key":"gyro_z","value":0.8,"module_type":"icm40608"}
+- pitch (float deg): Pitch angle (nose up/down), -90..+90 e.g. {"type":"sensor","key":"pitch","value":15.2,"module_type":"icm40608"}
+- roll (float deg): Roll angle (left/right tilt), -180..+180 e.g. {"type":"sensor","key":"roll","value":-8.4,"module_type":"icm40608"}
+- tilt (float deg): Total tilt from upright (0 = flat face-up, 180 = flat face-down) e.g. {"type":"sensor","key":"tilt","value":12,"module_type":"icm40608"}
+- orientation (string): Coarse orientation: face_up, face_down, edge_right, edge_left, edge_front, edge_back, unknown e.g. {"type":"state","key":"orientation","value":"face_up","module_type":"icm40608"}
+- shake (int): Edge-triggered shake/tap event (fires once per spike >1.8g) e.g. {"type":"button","key":"shake","value":1,"module_type":"icm40608"}
+
+### Button (button_module)
+Events the board sends:
+- button_press (int): Button press event (value=1) e.g. {"type":"button","key":"button_1","value":1}
+- button_release (int): Button release event (value=0) e.g. {"type":"button","key":"button_1","value":0}
+
+### Light Grid (neopixel_grid)
+Actions you send:
+- set_color (rgb_object): Set all LEDs to RGB color e.g. {"action":"set_color","value":{"r":255,"g":0,"b":0}}
+- brightness (int): Set LED brightness (0-255) e.g. {"action":"brightness","value":128}
+- clear (null): Turn off all LEDs e.g. {"action":"clear","value":null}
+- set_pixel (pixel_object): Light a single LED by linear index (0-8 for 3x3 grid). r/g/b are 0-255. e.g. {"action":"set_pixel","value":{"index":4,"r":255,"g":0,"b":0}}
+- set_pixel_xy (pixel_xy_object): Light a single LED by row/column (0-2 each on the 3x3 grid) e.g. {"action":"set_pixel_xy","value":{"row":1,"col":1,"r":255,"g":0,"b":0}}
+- set_row (pixel_row_object): Set every LED in row N (0-2) to RGB e.g. {"action":"set_row","value":{"row":0,"r":0,"g":255,"b":0}}
+- set_column (pixel_col_object): Set every LED in column N (0-2) to RGB e.g. {"action":"set_column","value":{"col":0,"r":0,"g":0,"b":255}}
+
+### Color Display (st7735_tft) - takes 2 ports
+Actions you send:
+- display_text (string): Display text on a cleared screen using the default font (white on black) e.g. {"action":"display_text","value":"Hello World"}
+- draw_text (styled_text_object): Draw text at (x, y) with size multiplier and RGB565 color. Does NOT clear screen first. e.g. {"action":"draw_text","value":{"text":"Hi","x":10,"y":20,"size":2,"color":65535}}
+- draw_pixel (point_object): Draw a single pixel at (x, y) in RGB565 color e.g. {"action":"draw_pixel","value":{"x":80,"y":40,"color":65504}}
+- draw_line (line_object): Draw a line from (x0, y0) to (x1, y1) in RGB565 color e.g. {"action":"draw_line","value":{"x0":0,"y0":0,"x1":159,"y1":79,"color":65535}}
+- draw_rect (rect_object): Draw an unfilled rectangle outline at (x, y) with size (w, h) in RGB565 color e.g. {"action":"draw_rect","value":{"x":20,"y":20,"w":40,"h":30,"color":2016}}
+- fill_rect (rect_object): Draw a filled rectangle at (x, y) with size (w, h) in RGB565 color e.g. {"action":"fill_rect","value":{"x":20,"y":20,"w":40,"h":30,"color":63488}}
+- draw_circle (circle_object): Draw an unfilled circle outline centered at (x, y) with radius r in RGB565 color e.g. {"action":"draw_circle","value":{"x":80,"y":40,"r":20,"color":2047}}
+- fill_circle (circle_object): Draw a filled circle centered at (x, y) with radius r in RGB565 color e.g. {"action":"fill_circle","value":{"x":80,"y":40,"r":20,"color":2047}}
+- fill_screen (int): Fill the entire screen with a single RGB565 color (use 0 for black, 65535 for white) e.g. {"action":"fill_screen","value":0}
+- set_rotation (int): Set display rotation: 0 = portrait, 1 = landscape (default), 2 = portrait flipped, 3 = landscape flipped e.g. {"action":"set_rotation","value":1}
+- clear_screen (null): Clear the display to black e.g. {"action":"clear_screen","value":null}
+
+### Big Screen (st7789_tft) - takes 2 ports
+Actions you send:
+- display_text (string): Display text on a cleared screen using the default font (white on black) e.g. {"action":"display_text","value":"Hello World"}
+- draw_text (styled_text_object): Draw text at (x, y) with size multiplier and RGB565 color. Does NOT clear screen first. e.g. {"action":"draw_text","value":{"text":"Hi","x":20,"y":60,"size":2,"color":65535}}
+- draw_pixel (point_object): Draw a single pixel at (x, y) in RGB565 color e.g. {"action":"draw_pixel","value":{"x":160,"y":120,"color":65504}}
+- draw_line (line_object): Draw a line from (x0, y0) to (x1, y1) in RGB565 color e.g. {"action":"draw_line","value":{"x0":0,"y0":0,"x1":319,"y1":239,"color":65535}}
+- draw_rect (rect_object): Draw an unfilled rectangle outline at (x, y) with size (w, h) in RGB565 color e.g. {"action":"draw_rect","value":{"x":40,"y":60,"w":80,"h":90,"color":2016}}
+- fill_rect (rect_object): Draw a filled rectangle at (x, y) with size (w, h) in RGB565 color e.g. {"action":"fill_rect","value":{"x":40,"y":60,"w":80,"h":90,"color":63488}}
+- draw_circle (circle_object): Draw an unfilled circle outline centered at (x, y) with radius r in RGB565 color e.g. {"action":"draw_circle","value":{"x":160,"y":120,"r":40,"color":2047}}
+- fill_circle (circle_object): Draw a filled circle centered at (x, y) with radius r in RGB565 color e.g. {"action":"fill_circle","value":{"x":160,"y":120,"r":40,"color":2047}}
+- fill_screen (int): Fill the entire screen with a single RGB565 color (use 0 for black, 65535 for white) e.g. {"action":"fill_screen","value":0}
+- set_rotation (int): Set display rotation: 0 = portrait, 1 = landscape upright on a left-side pair, 2 = portrait flipped, 3 = landscape upright on a right-side pair. Boot already picks the right landscape for the board side. e.g. {"action":"set_rotation","value":1}
+- clear_screen (null): Clear the display to black e.g. {"action":"clear_screen","value":null}
+
+### DC Motor (dc_motor)
+Actions you send:
+- motor_speed (int): Set motor speed (-255 to +255, negative=reverse) e.g. {"action":"motor_speed","value":200}
+- motor_stop (null): Coast to stop (free spin, no holding torque) e.g. {"action":"motor_stop","value":null}
+- motor_brake (null): Active brake (short the motor terminals: stops faster, holds position briefly) e.g. {"action":"motor_brake","value":null}
+
+### Knob (rotary_encoder_knob) - takes 2 ports
+Events the board sends:
+- knob_position (int): Current encoder position (cumulative turns) e.g. {"type":"sensor","key":"knob_position","value":42,"module_type":"rotary_encoder"}
+- knob_press (int): Knob button pressed e.g. {"type":"button","key":"knob_press","value":1}
+Actions you send:
+- set_ring_color (rgb_object): Set LED ring color e.g. {"action":"set_ring_color","value":{"r":255,"g":0,"b":0}}
+- set_ring_brightness (int): Set LED ring brightness (0-255) e.g. {"action":"set_ring_brightness","value":128}
+
+### Microphone (microphone) - takes 2 ports
+Events the board sends:
+- sound_level (int): RMS sound level (0-32767) e.g. {"type":"sensor","key":"sound_level","value":1200,"module_type":"microphone"}
+- sound_detected (int): Sound above threshold detected e.g. {"type":"button","key":"sound_detected","value":1}
+
+### Robot Arm Integrator (robot_arm)
+Events the board sends:
+- joint_positions (string): All 6 joint positions as comma-separated values (0-4095 each) e.g. {"type":"sensor","key":"joint_positions","value":"2048,2048,2048,2048,2048,2048","module_type":"robot_arm"}
+- joint_temp (int C): Joint temperature in Celsius (specify joint in module_type) e.g. {"type":"sensor","key":"joint_temp","value":38,"module_type":"robot_arm"}
+Actions you send:
+- move_joint (string): Move a single joint: value is 'joint_id:position[:time_ms]' e.g. '3:2048:500' e.g. {"action":"move_joint","value":"3:2048:500"}
+- move_all (string): Move all 6 joints: value is 'p1,p2,p3,p4,p5,p6[:time_ms]' e.g. '2048,2048,2048,2048,2048,2048:1000' e.g. {"action":"move_all","value":"2048,2048,2048,2048,2048,2048:1000"}
+- center_all (string): Center all joints to 2048. Value is optional time_ms e.g. '1000' e.g. {"action":"center_all","value":"1000"}
+- set_torque (string): Set torque: value is 'on' or 'off' (all joints) e.g. {"action":"set_torque","value":"on"}
+
+### Speaker (speaker) - takes 2 ports
+Actions you send:
+- play_tone (frequency_object): Play a tone at given frequency for duration (ms) e.g. {"action":"play_tone","value":{"frequency":440,"duration":1000}}
+- speaker_stop (null): Stop any sound e.g. {"action":"speaker_stop","value":null}
+- play_note (frequency_object): Like play_tone but with a short gap between notes. Better for melodies (85% sound, 15% silence) e.g. {"action":"play_note","value":{"frequency":523,"duration":250}}
+- play_chord (chord_object): Play multiple frequencies simultaneously (max 4) for the given duration in ms e.g. {"action":"play_chord","value":{"frequencies":[261,329,392],"duration":600}}
+- set_volume (float): Set output volume (0.0 silent .. 1.0 max). Persists across tones. e.g. {"action":"set_volume","value":0.5}
+
+### Soil Sensor (soil_sensor)
+Events the board sends:
+- moisture (float %): Calibrated soil moisture, 0-100 % e.g. {"type":"sensor","key":"moisture","value":42.7,"module_type":"soil_sensor"}
+- conductance (float uS): Conductance between the prongs in microsiemens, the uncalibrated physical measurement e.g. {"type":"sensor","key":"conductance","value":18.4,"module_type":"soil_sensor"}
+- soil_raw (int counts): Raw oversampled ADC reading, 0-65472. High means dry. Record this when calibrating e.g. {"type":"sensor","key":"soil_raw","value":31200,"module_type":"soil_sensor"}
+- soil (string): Probe condition: warming up, probe open, saturated, or ok e.g. {"type":"state","key":"soil","value":"probe open"}
+Actions you send:
+- calibrate_dry (null): Record the current reading as the 0% point. Call with the probe held in air e.g. {"action":"calibrate_dry","value":null}
+- calibrate_wet (null): Record the current reading as the 100% point. Call with the prongs standing in water e.g. {"action":"calibrate_wet","value":null}
+- read_now (null): Force an immediate measurement instead of waiting for the next timer tick e.g. {"action":"read_now","value":null}
+- set_status_color (string): Set the on-module status LED, as "r,g,b" with each 0-255. Takes the LED out of its automatic red-to-green-to-blue moisture ramp until set_status_auto e.g. {"action":"set_status_color","value":"0,40,0"}
+- set_status_auto (null): Return the status LED to its automatic moisture ramp: red dry, green moist, blue submerged e.g. {"action":"set_status_auto","value":null}
+- set_status_off (null): Turn the on-module status LED off. set_status_auto turns it back on e.g. {"action":"set_status_off","value":null}
+- set_status_brightness (int): Brightness of the automatic LED ramp, 0-255; default 24 e.g. {"action":"set_status_brightness","value":24}
+
+## Build with your own agent
+
+Install: pip install atech or uv pip install atech (Python 3.10+). SDK on PyPI: https://pypi.org/project/atech/, source: https://github.com/atechdotdev/python-sdk
+- atech guide: The SDK's manual for coding agents. Read first.
+- atech list-modules: Every module in the catalog, with its API.
+- atech new <name> --board <id>: A project.yaml, plus AGENTS.md and CLAUDE.md for the agent.
+- atech validate: Check the project before building.
+- atech build: Compile the project to ESP32 firmware, offline.
+- atech upload: Flash the board over USB-C.
+- atech check: Reboot the board and see which modules answered.
+
+Prompt to give the agent:
+
+Install the Atech Python SDK and use it to build my project:
+
+    pip install atech
+
+It needs Python 3.10 or newer. Then run `atech guide` and read all of it before
+anything else: it is the SDK's own manual for coding agents (the workflow, the
+rules, what will bite you). `atech guide protocol` covers the wire format.
+
+Atech is a modular electronics platform: pre-built hardware modules snap into
+numbered ports on an ESP32 motherboard, with no soldering or wiring. The SDK
+ships the module catalog, each module's API, and a bundled compiler that builds
+and flashes the board offline.
+
+Before you write any code, ask me:
+
+1. Which Atech board do I have? Run `atech list-boards` to see the boards and
+   their ports.
+2. Which modules do I own? Run `atech list-modules` to see every module the
+   SDK knows about, and ask me which of those I actually have in hand.
+3. Which port is each module plugged into?
+
+If I don't have a board yet, or I'm missing a module the build needs, point me
+to https://atech.dev/buy and suggest which kit fits what I described.
+
+Then:
+
+- Run `atech new <name> --board <board id>` and describe the build in its
+  project.yaml, using only modules I confirmed I own and the ports I confirmed
+  they're in. `atech info <module>` shows a module's API.
+- Run `atech validate`, then `atech build`, and fix anything they report.
+  Tell me first that the first build downloads the ESP32 compiler, about
+  2.4 GB, once.
+- Run `atech upload` with my board on USB-C (a data cable), then `atech check`
+  to see which modules answered, and tell me what to expect it to do.

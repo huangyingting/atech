@@ -1,0 +1,216 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  passwordHash     String
+  displayName      String?
+  avatarUrl        String?
+  role             String    @default("MEMBER")
+  accountType      String?
+  status           String    @default("ACTIVE")
+  sessionVersion   Int       @default(1)
+  plan             String    @default("free")
+  creditsAllowance Int       @default(2000)
+  creditsUsed      Int       @default(0)
+  creditsPurchased Int       @default(0)
+  themeMode        String    @default("light")
+  accentColor      String    @default("aurora")
+  analyticsConsent String    @default("unset")
+  invitedByCodeId  String?
+  revokedAt        DateTime?
+  revokedReason    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  invitedByCode    InvitationCode? @relation("RedeemedWithCode", fields: [invitedByCodeId], references: [id], onDelete: SetNull)
+  createdInvites   InvitationCode[] @relation("CreatedInvites")
+  projects         Project[]
+  communityPosts   CommunityPost[]
+  communityVotes   CommunityVote[]
+  auditLogs        AuditLog[]      @relation("ActorAuditLogs")
+  orders           StoreOrder[]
+  supportTickets   SupportTicket[]
+
+  @@index([role])
+  @@index([status])
+}
+
+model InvitationCode {
+  id                  String    @id @default(cuid())
+  code                String    @unique
+  codeHash            String    @unique
+  label               String?
+  emailHint           String?
+  assignedRole        String    @default("MEMBER")
+  assignedAccountType String?
+  maxUses             Int       @default(1)
+  usedCount           Int       @default(0)
+  expiresAt           DateTime
+  revokedAt           DateTime?
+  revokedReason       String?
+  createdById         String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  createdBy           User?     @relation("CreatedInvites", fields: [createdById], references: [id], onDelete: SetNull)
+  redeemedUsers       User[]    @relation("RedeemedWithCode")
+
+  @@index([expiresAt])
+  @@index([revokedAt])
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  action       String
+  actorUserId  String?
+  actorEmail   String?
+  targetType   String
+  targetId     String?
+  ipAddress    String?
+  userAgent    String?
+  metadataJson String   @default("{}")
+  createdAt    DateTime @default(now())
+
+  actor        User?    @relation("ActorAuditLogs", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([action])
+  @@index([actorUserId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+model Project {
+  id                       String   @id @default(uuid())
+  name                     String
+  title                    String
+  prompt                   String
+  ownerUserId              String?
+  ownerEmail               String?
+  anonSessionId            String?
+  boardId                  String   @default("14port_board")
+  sourcingMode             String   @default("atech_preferred")
+  currentPhase             String   @default("DONE")
+  writeSeq                 Int      @default(0)
+  starred                  Boolean  @default(false)
+  featured                 Boolean  @default(false)
+  forkedFromPostId         String?
+  briefJson                String   @default("{}")
+  placementJson            String   @default("{}")
+  electronicsArtifactsJson String   @default("{}")
+  firmwareArtifactsJson    String   @default("{}")
+  wifiConfigJson           String   @default("{}")
+  eventsJson               String   @default("[]")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  owner                    User?               @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+  ratings                  ProjectTurnRating[]
+  communityPosts           CommunityPost[]
+
+  @@index([ownerUserId])
+  @@index([starred])
+  @@index([updatedAt])
+}
+
+model ProjectTurnRating {
+  id        String   @id @default(cuid())
+  projectId String
+  jobId     String
+  userId    String?
+  rating    String
+  comment   String?
+  createdAt DateTime @default(now())
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model CommunityPost {
+  id            String   @id @default(cuid())
+  projectId     String?
+  authorUserId  String?
+  authorHandle  String
+  title         String
+  summary       String
+  description   String   @default("")
+  category      String   @default("Gadgets")
+  coverSvgOrUrl String?
+  modulesJson   String   @default("[]")
+  score         Int      @default(1)
+  buildCount    Int      @default(0)
+  featured      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project       Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  author        User?           @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  votes         CommunityVote[]
+
+  @@index([category])
+  @@index([score])
+}
+
+model CommunityVote {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  voted     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+}
+
+model StoreOrder {
+  id            String   @id @default(cuid())
+  userId        String?
+  email         String
+  shippingName  String?
+  countryCode   String   @default("US")
+  currency      String   @default("USD")
+  itemsJson     String   @default("[]")
+  subtotalMinor Int      @default(0)
+  shippingMinor Int      @default(0)
+  totalMinor    Int      @default(0)
+  status        String   @default("confirmed")
+  createdAt     DateTime @default(now())
+
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model SupportTicket {
+  id        String   @id @default(cuid())
+  userId    String?
+  email     String
+  pageUrl   String?
+  projectId String?
+  subject   String   @default("Studio Support")
+  message   String
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model EnterpriseInquiry {
+  id               String   @id @default(cuid())
+  vertical         String   @default("industry")
+  name             String
+  email            String
+  organization     String
+  role             String?
+  quantityEstimate String?
+  message          String
+  status           String   @default("new")
+  createdAt        DateTime @default(now())
+}
